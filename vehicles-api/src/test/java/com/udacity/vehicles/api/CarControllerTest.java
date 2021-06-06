@@ -1,5 +1,6 @@
 package com.udacity.vehicles.api;
 
+import static java.lang.Thread.sleep;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,9 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.udacity.vehicles.client.maps.MapsClient;
 import com.udacity.vehicles.client.prices.PriceClient;
+import com.udacity.vehicles.client.prices.PriceClientRT;
 import com.udacity.vehicles.domain.Condition;
 import com.udacity.vehicles.domain.Location;
 import com.udacity.vehicles.domain.car.Car;
+import com.udacity.vehicles.domain.car.CarRepository;
 import com.udacity.vehicles.domain.car.Details;
 import com.udacity.vehicles.domain.manufacturer.Manufacturer;
 import com.udacity.vehicles.service.CarService;
@@ -23,7 +26,13 @@ import java.net.URI;
 import java.util.Collections;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.*;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.AutoConfigureJsonTesters;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -34,6 +43,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
+
+
 /**
  * Implements testing of the CarController class.
  */
@@ -41,10 +52,13 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @AutoConfigureJsonTesters
+//@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CarControllerTest {
 
     @Autowired
     private MockMvc mvc;
+  //  @Autowired
+  //  private WebApplicationContext webApplicationContext;
 
     @Autowired
     private JacksonTester<Car> json;
@@ -56,8 +70,24 @@ public class CarControllerTest {
     private PriceClient priceClient;
 
     @MockBean
+    private PriceClientRT priceClientRT;
+
+    @MockBean
     private MapsClient mapsClient;
 
+    @MockBean
+    private  CarRepository repository;
+
+
+
+    private final Logger logger= LoggerFactory.getLogger(CarControllerTest.class);
+
+   /** @Before
+    public void init(){
+        logger.debug("====set up MVC====");
+        mvc= webAppContextSetup(webApplicationContext).build();
+    }
+   */
     /**
      * Creates pre-requisites for testing, such as an example car.
      */
@@ -65,7 +95,7 @@ public class CarControllerTest {
     public void setup() {
         Car car = getCar();
         car.setId(1L);
-        given(carService.save(any())).willReturn(car);
+        //given(carService.save(any())).willReturn(car);
         given(carService.findById(any())).willReturn(car);
         given(carService.list()).willReturn(Collections.singletonList(car));
     }
@@ -75,27 +105,36 @@ public class CarControllerTest {
      * @throws Exception when car creation fails in the system
      */
     @Test
+   // @Order(1)
     public void createCar() throws Exception {
+        logger.debug("====Test 1=====");
         Car car = getCar();
         mvc.perform(
                 post(new URI("/cars"))
                         .content(json.write(car).getJson())
                         .contentType(MediaType.APPLICATION_JSON_UTF8)
                         .accept(MediaType.APPLICATION_JSON_UTF8))
-                .andExpect(status().isCreated());
-    }
+               .andExpect(status().isCreated());
+   }
 
     /**
      * Tests if the read operation appropriately returns a list of vehicles.
      * @throws Exception if the read operation of the vehicle list fails
      */
     @Test
+    @Order(2)
     public void listCars() throws Exception {
         /**
          * TODO: Add a test to check that the `get` method works by calling
          *   the whole list of vehicles. This should utilize the car from `getCar()`
          *   below (the vehicle will be the first in the list).
          */
+        logger.debug("====Test 2=====");
+        mvc.perform(
+                get(new URI("/cars"))
+                        .contentType(MediaType.APPLICATION_JSON_UTF8)
+                        .accept(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(status().isOk());
 
     }
 
@@ -104,11 +143,18 @@ public class CarControllerTest {
      * @throws Exception if the read operation for a single car fails
      */
     @Test
+    @Order(3)
     public void findCar() throws Exception {
         /**
          * TODO: Add a test to check that the `get` method works by calling
          *   a vehicle by ID. This should utilize the car from `getCar()` below.
          */
+
+        logger.debug("====Test 3=====");
+        mvc.perform(get("/cars/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.details.model").value("Impala"));
     }
 
     /**
@@ -122,6 +168,10 @@ public class CarControllerTest {
          *   when the `delete` method is called from the Car Controller. This
          *   should utilize the car from `getCar()` below.
          */
+        logger.debug("===Test 4====");
+        //delete it, but all are mocking, nothing in DB, expect notFound
+        mvc.perform(delete("cars/1"))
+                .andExpect(status().isNotFound());
     }
 
     /**
