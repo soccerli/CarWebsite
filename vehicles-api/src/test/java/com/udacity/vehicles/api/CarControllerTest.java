@@ -1,14 +1,10 @@
 package com.udacity.vehicles.api;
 
-import static java.lang.Thread.sleep;
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,10 +22,8 @@ import java.net.URI;
 import java.util.Collections;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.*;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +33,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.json.JacksonTester;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
+import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.http.*;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -49,11 +44,16 @@ import org.springframework.test.web.servlet.MockMvc;
  * Implements testing of the CarController class.
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @AutoConfigureJsonTesters
 //@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CarControllerTest {
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    RestClientForTest restClientForTest;
 
     @Autowired
     private MockMvc mvc;
@@ -95,7 +95,7 @@ public class CarControllerTest {
     public void setup() {
         Car car = getCar();
         car.setId(1L);
-        //given(carService.save(any())).willReturn(car);
+        given(carService.save(any())).willReturn(car);
         given(carService.findById(any())).willReturn(car);
         given(carService.list()).willReturn(Collections.singletonList(car));
     }
@@ -173,6 +173,37 @@ public class CarControllerTest {
         mvc.perform(delete("cars/1"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    public void testWithRestTemplate() throws Exception{
+        //test car creation
+        logger.debug("==Test with RestTemplate:Create===");
+        Car car=getCar();
+        String jsonInString=restClientForTest.carToJsonString(car);
+        String created_jsonInString = restClientForTest.create(port,"/cars/",jsonInString);
+        Car created_car = restClientForTest.JsonStringToCar(created_jsonInString);
+        logger.debug("created_car: id="+created_car.getId()+" created_car:model="+created_car.getDetails().getModel());
+        Assertions.assertEquals(1,created_car.getId());
+        Assertions.assertEquals("Impala",created_car.getDetails().getModel());
+
+        //test car update.todo: looks the update is not working, need to find out
+        created_car.setCondition(Condition.NEW);
+        jsonInString=restClientForTest.carToJsonString(car);
+        String updated_jsonInString=restClientForTest.update(port,"/cars/"+created_car.getId().toString(),jsonInString).getBody();
+        logger.debug("updated Car="+updated_jsonInString);
+
+        //test car get
+        String queried_jsonInString=restClientForTest.get(port,"/cars/"+created_car.getId().toString());
+        Car queried_car=restClientForTest.JsonStringToCar(queried_jsonInString);
+        logger.debug("queried Car: condition="+queried_car.getCondition()+" model="+queried_car.getDetails().getModel());
+        Assertions.assertEquals("Impala",queried_car.getDetails().getModel());
+
+        //test car delete
+        ResponseEntity<String> res=restClientForTest.delete(port,"/cars/"+created_car.getId().toString());
+        Assertions.assertEquals(HttpStatus.OK,res.getStatusCode());
+
+    }
+
 
     /**
      * Creates an example Car object for use in testing.
