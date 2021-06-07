@@ -186,9 +186,9 @@ public class CarControllerTest {
         Assertions.assertEquals(1,created_car.getId());
         Assertions.assertEquals("Impala",created_car.getDetails().getModel());
 
-        //test car update.todo: looks the update is not working, need to find out
+        //test car update.
         created_car.setCondition(Condition.NEW);
-        jsonInString=restClientForTest.carToJsonString(car);
+        jsonInString=restClientForTest.carToJsonString(created_car);
         String updated_jsonInString=restClientForTest.update(port,"/cars/"+created_car.getId().toString(),jsonInString).getBody();
         logger.debug("updated Car="+updated_jsonInString);
 
